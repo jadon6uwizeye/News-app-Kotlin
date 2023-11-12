@@ -31,48 +31,41 @@ class NewsActivity : AppCompatActivity() {
         // Check for fingerprint availability and authenticate if possible
         authenticateWithBiometrics()
 
-//        setContentView(R.layout.activity_news)
-//
-//        val newsRepository = NewsRepository(ArticleDatabase(this))
-//        val viewModelProviderFactory = NewsViewModelProviderFactory(newsRepository)
-//        viewModel = ViewModelProvider(this, viewModelProviderFactory).get(NewsViewModel::class.java)
-//        bottomNavigationView.setupWithNavController(newNavHostFragment.findNavController())
     }
 
     private fun authenticateWithBiometrics() {
-
-        val executor = ContextCompat.getMainExecutor(this)
-        biometricPrompt = BiometricPrompt(this, executor, object : BiometricPrompt.AuthenticationCallback() {
-            override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                super.onAuthenticationError(errorCode, errString)
-                displayMessage("Authentication error: $errString")
-                continueWithNormalAppFlow()
-            }
-
-            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                super.onAuthenticationSucceeded(result)
-                displayMessage("Authentication succeeded!")
-                continueWithNormalAppFlow()
-            }
-
-            override fun onAuthenticationFailed() {
-                super.onAuthenticationFailed()
-                displayMessage("Authentication failed")
-                continueWithNormalAppFlow()
-            }
-        })
-
-        promptInfo = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Biometric Authentication")
-            .setSubtitle("Log in using your biometric credential")
-            .setNegativeButtonText("Cancel")
-            .build()
-
         val biometricManager = BiometricManager.from(this)
+
         when (biometricManager.canAuthenticate()) {
             BiometricManager.BIOMETRIC_SUCCESS -> {
+                val executor = ContextCompat.getMainExecutor(this)
+                biometricPrompt = BiometricPrompt(this, executor, object : BiometricPrompt.AuthenticationCallback() {
+                    override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                        super.onAuthenticationError(errorCode, errString)
+                        displayMessage("Authentication error: $errString")
+                        continueWithNormalAppFlow()
+                    }
+
+                    override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                        super.onAuthenticationSucceeded(result)
+                        displayMessage("Authentication succeeded!")
+                        continueWithNormalAppFlow()
+                    }
+
+                    override fun onAuthenticationFailed() {
+                        super.onAuthenticationFailed()
+                        displayMessage("Authentication failed")
+//                        continueWithNormalAppFlow()
+                    }
+                })
+
+                promptInfo = BiometricPrompt.PromptInfo.Builder()
+                    .setTitle("Biometric Authentication")
+                    .setSubtitle("Log in using your biometric credential")
+                    .setNegativeButtonText("Cancel")
+                    .build()
+
                 biometricPrompt.authenticate(promptInfo)
-                continueWithNormalAppFlow()
             }
             BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE -> {
                 displayMessage("This device doesn't support biometric authentication")
@@ -83,7 +76,7 @@ class NewsActivity : AppCompatActivity() {
                 continueWithNormalAppFlow()
             }
             BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> {
-                displayMessage("No biometric credentials are enrolled")
+                displayMessage("No biometric credentials enrolled")
                 continueWithNormalAppFlow()
             }
         }
@@ -94,10 +87,14 @@ class NewsActivity : AppCompatActivity() {
     }
 
     private fun continueWithNormalAppFlow() {
+        if (!this::viewModel.isInitialized) {
+            val newsRepository = NewsRepository(ArticleDatabase(this))
+            val viewModelProviderFactory = NewsViewModelProviderFactory(newsRepository)
+            viewModel = ViewModelProvider(this, viewModelProviderFactory)[NewsViewModel::class.java]
+        }
+
         setContentView(R.layout.activity_news)
-        val newsRepository = NewsRepository(ArticleDatabase(this))
-        val viewModelProviderFactory = NewsViewModelProviderFactory(newsRepository)
-        viewModel = ViewModelProvider(this, viewModelProviderFactory)[NewsViewModel::class.java]
         bottomNavigationView.setupWithNavController(newNavHostFragment.findNavController())
     }
+
 }
