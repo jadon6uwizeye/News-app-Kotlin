@@ -14,16 +14,22 @@ import news_app.db.ArticleDatabase
 import news_app.repository.NewsRepository
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
+import androidx.biometric.BiometricManager
+import androidx.core.content.ContextCompat
+import android.view.View
+import android.widget.Toast
 
 class NewsActivity : AppCompatActivity() {
 
     lateinit var viewModel: NewsViewModel
+    private lateinit var biometricPrompt: BiometricPrompt
+    private lateinit var promptInfo: BiometricPrompt.PromptInfo
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         // Check for fingerprint availability and authenticate if possible
-        authenticateWithFingerprint()
+        authenticateWithBiometrics()
 
 //        setContentView(R.layout.activity_news)
 //
@@ -33,41 +39,58 @@ class NewsActivity : AppCompatActivity() {
 //        bottomNavigationView.setupWithNavController(newNavHostFragment.findNavController())
     }
 
-    private fun authenticateWithFingerprint() {
-        val fingerprintManager = getSystemService(Context.FINGERPRINT_SERVICE) as FingerprintManager
+    private fun authenticateWithBiometrics() {
 
-        if (fingerprintManager.isHardwareDetected && fingerprintManager.hasEnrolledFingerprints()) {
-            val executor: Executor = Executors.newSingleThreadExecutor()
-            val biometricPrompt = BiometricPrompt(this, executor,
-                object : BiometricPrompt.AuthenticationCallback() {
-                    override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                        super.onAuthenticationSucceeded(result)
-                        println("Finger print Authentication successfully proceeding with normal flow")
-                        continueWithNormalAppFlow()
-                    }
+        val executor = ContextCompat.getMainExecutor(this)
+        biometricPrompt = BiometricPrompt(this, executor, object : BiometricPrompt.AuthenticationCallback() {
+            override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                super.onAuthenticationError(errorCode, errString)
+                displayMessage("Authentication error: $errString")
+                continueWithNormalAppFlow()
+            }
 
-                    override fun onAuthenticationError(
-                        errorCode: Int,
-                        errString: CharSequence
-                    ) {
-                        super.onAuthenticationError(errorCode, errString)
-                        println("Fingerprint Authentication failed Proceeding with normal flow")
-                        continueWithNormalAppFlow()
-                    }
-                })
+            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                super.onAuthenticationSucceeded(result)
+                displayMessage("Authentication succeeded!")
+                continueWithNormalAppFlow()
+            }
 
-            val promptInfo = BiometricPrompt.PromptInfo.Builder()
-                .setTitle("Fingerprint Authentication")
-                .setDescription("Use your fingerprint to authenticate")
-                .setNegativeButtonText("Cancel")
-                .build()
+            override fun onAuthenticationFailed() {
+                super.onAuthenticationFailed()
+                displayMessage("Authentication failed")
+                continueWithNormalAppFlow()
+            }
+        })
 
-            // Prompt the user for fingerprint authentication
-            biometricPrompt.authenticate(promptInfo)
-        } else {
-            println("Fingerprint not available or not configured, proceeding with normal app flow")
-            continueWithNormalAppFlow()
+        promptInfo = BiometricPrompt.PromptInfo.Builder()
+            .setTitle("Biometric Authentication")
+            .setSubtitle("Log in using your biometric credential")
+            .setNegativeButtonText("Cancel")
+            .build()
+
+        val biometricManager = BiometricManager.from(this)
+        when (biometricManager.canAuthenticate()) {
+            BiometricManager.BIOMETRIC_SUCCESS -> {
+                biometricPrompt.authenticate(promptInfo)
+                continueWithNormalAppFlow()
+            }
+            BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE -> {
+                displayMessage("This device doesn't support biometric authentication")
+                continueWithNormalAppFlow()
+            }
+            BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE -> {
+                displayMessage("Biometric authentication is currently unavailable")
+                continueWithNormalAppFlow()
+            }
+            BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> {
+                displayMessage("No biometric credentials are enrolled")
+                continueWithNormalAppFlow()
+            }
         }
+    }
+
+    private fun displayMessage(message: String) {
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
     }
 
     private fun continueWithNormalAppFlow() {
